@@ -1,6 +1,6 @@
-<br><br>
-    <div style="font-size: 12px; color: #888; border-top: 1px solid #ddd; padding-top: 10px;">
-        &copy; 2025 Klinik Prestasi Sistem CRUD Sederhana Kelompok 5
-    </div>
+</main>
+    <footer style="background: #ffffff; border-top: 1px solid #e2e8f0; margin-top: 48px; padding: 18px 24px; text-align: center; font-size: 13px; color: #64748b;">
+        &copy; 2025 <strong>Klinik Prestasi UKM Forces IPB</strong> — Sistem Manajemen Basis Data (Kelompok 5)
+    </footer>
 </body>
 </html>

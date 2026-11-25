@@ -1,33 +1,63 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard Utama</title>
-    <style>
-        body { font-family: sans-serif; margin: 40px; text-align: center; }
-        .menu-box { display: inline-block; margin: 10px; padding: 20px; border: 1px solid #ccc; width: 220px; background: #f9f9f9; border-radius: 8px; vertical-align: top; height: 100px; }
-        a { text-decoration: none; font-weight: bold; color: #007bff; font-size: 18px; display: block; margin-bottom: 10px; }
-        a:hover { text-decoration: underline; color: #0056b3; }
-        p { color: #666; margin-bottom: 30px; }
-        span { font-size: 13px; color: #555; line-height: 1.4; display: block; }
-    </style>
-</head>
-<body>
-    <h1>Klinik Prestasi</h1>
-    <p>Sistem Informasi Manajemen Data & Review</p>
+<?php
+include 'config/db.php';
+include 'layout/header.php';
 
-    <div class="menu-box">
-        <a href="mahasiswa/index.php">Data Mahasiswa</a>
-        <span>Kelola data mahasiswa, angkatan, dan kontak.</span>
-    </div>
+// Mengambil ringkasan statistik real-time dari database
+$q_mhs = pg_fetch_assoc(pg_query($conn, "SELECT COUNT(*) AS total FROM MAHASISWA WHERE Status_Mhs = 'Aktif'"));
+$q_karya = pg_fetch_assoc(pg_query($conn, "SELECT COUNT(*) AS total FROM KARYA"));
+$q_review = pg_fetch_assoc(pg_query($conn, "SELECT COUNT(*) AS total FROM PEER_REVIEW WHERE Status_Review = 'Menunggu'"));
+$q_selesai = pg_fetch_assoc(pg_query($conn, "SELECT COUNT(*) AS total FROM PEER_REVIEW WHERE Status_Review = 'Selesai'"));
+?>
 
-    <div class="menu-box">
-        <a href="karya/index.php">Data Karya</a>
-        <span>Kelola judul karya, penulis, dan bidang.</span>
-    </div>
+<div class="hero-header">
+    <h1>Klinik Prestasi UKM Forces IPB</h1>
+    <p>Sistem Informasi Manajemen Data Mahasiswa, Pengajuan Karya, dan Pemantauan Peer Review</p>
+</div>
 
-    <div class="menu-box">
-        <a href="peer_review/index.php">Peer Review</a>
-        <span>Pantau status review karya mahasiswa.</span>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Mahasiswa Aktif</div>
+        <div class="stat-value"><?= $q_mhs['total'] ?? 0 ?></div>
     </div>
-</body>
-</html>
+    <div class="stat-card">
+        <div class="stat-label">Total Karya Terdaftar</div>
+        <div class="stat-value"><?= $q_karya['total'] ?? 0 ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Review Menunggu</div>
+        <div class="stat-value" style="color: #d97706;"><?= $q_review['total'] ?? 0 ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Review Selesai</div>
+        <div class="stat-value" style="color: #059669;"><?= $q_selesai['total'] ?? 0 ?></div>
+    </div>
+</div>
+
+<h2>Menu Utama</h2>
+<div class="menu-grid">
+    <a href="mahasiswa/index.php" class="menu-card">
+        <div>
+            <div class="menu-card-title">Data Mahasiswa</div>
+            <div class="menu-card-desc">Kelola biodata mahasiswa, angkatan, kontak, dan status keanggotaan aktif.</div>
+        </div>
+        <div class="menu-card-link">Buka Modul Mahasiswa &rarr;</div>
+    </a>
+
+    <a href="karya/index.php" class="menu-card">
+        <div>
+            <div class="menu-card-title">Data Karya</div>
+            <div class="menu-card-desc">Kelola judul karya ilmiah, esai, bisnis, desain, beserta tautan dokumen Drive.</div>
+        </div>
+        <div class="menu-card-link">Buka Modul Karya &rarr;</div>
+    </a>
+
+    <a href="peer_review/index.php" class="menu-card">
+        <div>
+            <div class="menu-card-title">Peer Review</div>
+            <div class="menu-card-desc">Tugaskan mentor penilai, pantau progres peninjauan, dan catat hasil evaluasi karya.</div>
+        </div>
+        <div class="menu-card-link">Buka Modul Peer Review &rarr;</div>
+    </a>
+</div>
+
+<?php include 'layout/footer.php'; ?>
