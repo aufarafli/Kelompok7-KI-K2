@@ -1,64 +1,76 @@
 <?php
 include '../config/db.php';
+include '../layout/header.php';
+wajibRole(['admin', 'mahasiswa']);
 
-$id_url = isset($_GET['id']) ? $_GET['id'] : '';
-if (empty($id_url)) { header("Location: index.php"); exit; }
+$id = trim((string)($_GET['id'] ?? ''));
+if ($id === '') {
+    echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px;'>ID karya tidak valid.</div>";
+    include '../layout/footer.php';
+    exit;
+}
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $id_old = $_POST['id_old'];
-    $judul = $_POST['judul'];
-    $id_user = $_POST['id_user'];
-    $bidang = $_POST['bidang'];
-    $link_drive = $_POST['link_drive']; 
+$res  = pg_query_params($conn, "SELECT * FROM KARYA WHERE TRIM(ID_Karya) = $1", [$id]);
+$data = pg_fetch_assoc($res);
 
-    $query = "UPDATE KARYA SET Judul_Karya=$1, ID_User=$2, Bidang_Karya=$3, File_Karya=$4 WHERE ID_Karya=$5";
-    $params = array($judul, $id_user, $bidang, $link_drive, $id_old);
-    
-    $result = pg_query_params($conn, $query, $params);
+if (!$data) {
+    echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px;'>Data karya tidak ditemukan.</div>";
+    include '../layout/footer.php';
+    exit;
+}
 
-    if ($result) {
+// Anti-IDOR: Mahasiswa hanya boleh mengedit karyanya sendiri
+if (hasRole('mahasiswa') && trim((string)($data['id_user'] ?? '')) !== trim((string)$_SESSION['user_id'])) {
+    echo "<script>alert('Akses Ditolak! Karya ini bukan milik Anda.'); window.location='index.php';</script>";
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $judul  = trim((string)($_POST['judul'] ?? ''));
+    $bidang = trim((string)($_POST['bidang'] ?? ''));
+    $file   = trim((string)($_POST['file'] ?? ''));
+
+    $update = pg_query_params(
+        $conn,
+        "UPDATE KARYA SET Judul_Karya = $1, Bidang_Karya = $2, File_Karya = $3 WHERE TRIM(ID_Karya) = $4",
+        [$judul, $bidang, $file, $id]
+    );
+
+    if ($update) {
         echo "<script>alert('Data karya berhasil diperbarui!'); window.location='index.php';</script>";
+        exit;
     } else {
-        echo "<script>alert('Gagal mengubah data.');</script>";
+        echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px; margin-bottom:16px;'>Gagal memperbarui karya: " . htmlspecialchars(pg_last_error($conn), ENT_QUOTES, 'UTF-8') . "</div>";
     }
 }
 
-$query_get = "SELECT * FROM KARYA WHERE ID_Karya = $1";
-$data = pg_fetch_assoc(pg_query_params($conn, $query_get, array($id_url)));
-if (!$data) die("Data tidak ditemukan.");
-$data = array_change_key_case($data, CASE_UPPER);
-
-include '../layout/header.php';
+$bidang_aktif = trim((string)($data['bidang_karya'] ?? 'Esai'));
 ?>
 
-<h2>Edit Karya</h2>
+<h2>Edit Data Karya</h2>
 <div class="form-box">
     <form action="" method="POST">
-        <input type="hidden" name="id_old" value="<?= $data['ID_KARYA'] ?>">
-        
-        <label>ID Karya (Tetap)</label>
-        <input type="text" value="<?= $data['ID_KARYA'] ?>" disabled style="background:#ddd;">
+        <label>ID Karya</label>
+        <input type="text" value="<?= htmlspecialchars(trim((string)$data['id_karya']), ENT_QUOTES, 'UTF-8') ?>" disabled>
 
         <label>Judul Karya</label>
-        <input type="text" name="judul" value="<?= $data['JUDUL_KARYA'] ?>" required>
-
-        <label>ID User</label>
-        <input type="text" name="id_user" value="<?= $data['ID_USER'] ?>" required>
+        <input type="text" name="judul" required value="<?= htmlspecialchars((string)($data['judul_karya'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
 
         <label>Bidang Karya</label>
         <select name="bidang" required>
-            <option value="Esai" <?= ($data['BIDANG_KARYA']=='Esai')?'selected':'' ?>>Esai</option>
-            <option value="KTI" <?= ($data['BIDANG_KARYA']=='KTI')?'selected':'' ?>>KTI</option>
-            <option value="Bisnis" <?= ($data['BIDANG_KARYA']=='Bisnis')?'selected':'' ?>>Bisnis</option>
-            <option value="Design" <?= ($data['BIDANG_KARYA']=='Design')?'selected':'' ?>>Design</option>
+            <option value="Esai" <?= strcasecmp($bidang_aktif, 'Esai') === 0 ? 'selected' : '' ?>>Esai</option>
+            <option value="KTI" <?= strcasecmp($bidang_aktif, 'KTI') === 0 ? 'selected' : '' ?>>KTI</option>
+            <option value="Bisnis" <?= strcasecmp($bidang_aktif, 'Bisnis') === 0 ? 'selected' : '' ?>>Bisnis</option>
+            <option value="Design" <?= strcasecmp($bidang_aktif, 'Design') === 0 ? 'selected' : '' ?>>Design</option>
         </select>
 
-        <label>Link Google Drive</label>
-        <input type="url" name="link_drive" value="<?= isset($data['FILE_KARYA']) ? $data['FILE_KARYA'] : '' ?>" placeholder="https://drive.google.com/..." style="border: 1px solid #28a745;">
+        <label>Link File Karya (Google Drive / GitHub)</label>
+        <input type="url" name="file" required value="<?= htmlspecialchars((string)($data['file_karya'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
 
-        <br><br>
-        <button type="submit" class="btn btn-blue">Update</button>
-        <a href="index.php" class="btn btn-gray">Batal</a>
+        <div style="margin-top: 20px; display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-blue">Simpan Perubahan</button>
+            <a href="index.php" class="btn btn-gray">Batal</a>
+        </div>
     </form>
 </div>
 

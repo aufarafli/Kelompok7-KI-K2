@@ -1,8 +1,6 @@
 <?php
-// Deteksi folder saat ini untuk mengatur path navigasi & menu aktif otomatis
-$current_dir = basename(dirname($_SERVER['PHP_SELF']));
-$is_root = ($current_dir === 'klinik_prestasi');
-$base_path = $is_root ? '' : '../';
+require_once __DIR__ . '/../config/auth.php';
+$is_home = ($current_dir === '');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -48,7 +46,6 @@ $base_path = $is_root ? '' : '../';
             min-height: 100vh;
         }
 
-        /* Navbar Modern */
         .navbar {
             background-color: var(--bg-card);
             border-bottom: 1px solid var(--border-color);
@@ -112,7 +109,6 @@ $base_path = $is_root ? '' : '../';
             font-weight: 600;
         }
 
-        /* Kontainer Utama Halaman */
         .main-container {
             max-width: 1140px;
             width: 100%;
@@ -133,7 +129,6 @@ $base_path = $is_root ? '' : '../';
             letter-spacing: -0.02em;
         }
 
-        /* Tombol Global (Kompatibel dengan kelas lama) */
         .btn {
             padding: 8px 14px;
             text-decoration: none;
@@ -160,7 +155,6 @@ $base_path = $is_root ? '' : '../';
         .btn-gray { background-color: var(--secondary); }
         .btn-gray:hover { background-color: var(--secondary-hover); }
 
-        /* Tabel Modern */
         table {
             border-collapse: separate;
             border-spacing: 0;
@@ -194,7 +188,6 @@ $base_path = $is_root ? '' : '../';
         tr:nth-child(even) { background-color: #fcfcfd; }
         tbody tr:hover { background-color: var(--primary-soft); transition: background 0.15s; }
 
-        /* Form Box Modern */
         .form-box {
             background: var(--bg-card);
             padding: 28px;
@@ -246,7 +239,6 @@ $base_path = $is_root ? '' : '../';
             cursor: not-allowed;
         }
 
-        /* Dashboard Cards (Untuk index.php) */
         .hero-header {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
             color: white;
@@ -328,10 +320,33 @@ $base_path = $is_root ? '' : '../';
                 <span>KP</span> Klinik Prestasi
             </a>
             <div class="nav-links">
-                <a href="<?= $base_path ?>index.php" class="<?= $is_root ? 'active' : '' ?>">Home</a>
-                <a href="<?= $base_path ?>mahasiswa/index.php" class="<?= ($current_dir === 'mahasiswa') ? 'active' : '' ?>">Data Mahasiswa</a>
-                <a href="<?= $base_path ?>karya/index.php" class="<?= ($current_dir === 'karya') ? 'active' : '' ?>">Data Karya</a>
+                <a href="<?= $base_path ?>index.php" class="<?= $is_home ? 'active' : '' ?>">Home</a>
+                <?php if (hasRole('admin')): ?>
+                    <a href="<?= $base_path ?>mahasiswa/index.php" class="<?= ($current_dir === 'mahasiswa') ? 'active' : '' ?>">Daftar Pengguna</a>
+                <?php endif; ?>
+                <?php if (hasRole(['admin', 'mahasiswa'])): ?>
+                    <a href="<?= $base_path ?>karya/index.php" class="<?= ($current_dir === 'karya') ? 'active' : '' ?>">Data Karya</a>
+                <?php endif; ?>
                 <a href="<?= $base_path ?>peer_review/index.php" class="<?= ($current_dir === 'peer_review') ? 'active' : '' ?>">Peer Review</a>
+                <?php if (hasRole('admin')): ?>
+                    <a href="<?= $base_path ?>audit_log/index.php" class="<?= ($current_dir === 'audit_log') ? 'active' : '' ?>">Audit Log</a>
+                <?php endif; ?>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="text-align: right; line-height: 1.3;">
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">
+                        <?= htmlspecialchars((string)($_SESSION['nama'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 2px;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px;">
+                            <?= htmlspecialchars((string)($_SESSION['role'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                        <span style="font-size: 11px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                            ID: <?= htmlspecialchars((string)($_SESSION['user_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                    </div>
+                </div>
+                <a href="<?= $base_path ?>logout.php" class="btn btn-red" onclick="return confirm('Yakin ingin keluar dari sistem?');">Logout</a>
             </div>
         </div>
     </nav>

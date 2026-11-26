@@ -1,67 +1,116 @@
 <?php
 include '../config/db.php';
+include '../layout/header.php';
+wajibRole('admin');
 
-$nim_url = isset($_GET['nim']) ? $_GET['nim'] : '';
-if (empty($nim_url)) { header("Location: index.php"); exit; }
+$nim = $_GET['nim'] ?? '';
+$query_get = "
+    SELECT 
+        U.ID_User, 
+        M.*, 
+        A.ID_Admin, 
+        A.Jabatan, 
+        MT.ID_Mentor, 
+        MT.Bidang_Keahlian,
+        MT.Status_Mentor
+    FROM MAHASISWA M 
+    LEFT JOIN USER_MEMBER U ON M.NIM = U.NIM 
+    LEFT JOIN ADMIN A ON U.ID_User = A.ID_User
+    LEFT JOIN MENTOR MT ON U.ID_User = MT.ID_User
+    WHERE M.NIM = $1
+";
+$res  = pg_query_params($conn, $query_get, array($nim));
+$data = pg_fetch_assoc($res);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $nim_old = $_POST['nim_old']; 
-    $nama = $_POST['nama'];
-    $angkatan = $_POST['angkatan'];
-    $kontak = $_POST['kontak'];
-    $status = $_POST['status']; 
-
-    $query = "UPDATE MAHASISWA SET Nama=$1, Angkatan=$2, Kontak=$3, Status_Mhs=$4 WHERE NIM=$5";
-    $params = array($nama, $angkatan, $kontak, $status, $nim_old);
-    
-    $result = pg_query_params($conn, $query, $params);
-
-    if ($result) {
-        echo "<script>alert('Data & Status berhasil diperbarui!'); window.location='index.php';</script>";
-    } else {
-        echo "<script>alert('Gagal update.');</script>";
-    }
+if (!$data) {
+    echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px;'>Data pengguna tidak ditemukan.</div>";
+    include '../layout/footer.php';
+    exit;
 }
 
-$query_get = "SELECT * FROM MAHASISWA WHERE NIM = $1";
-$data = pg_fetch_assoc(pg_query_params($conn, $query_get, array($nim_url)));
-$data = array_change_key_case($data, CASE_UPPER);
+// Deteksi peran pengguna secara otomatis
+$role_target  = 'mahasiswa';
+$judul_halaman = 'Edit Data Mahasiswa';
+$label_status  = 'Status Mahasiswa';
 
-include '../layout/header.php';
+if (!empty($data['id_admin'])) {
+    $role_target   = 'admin';
+    $judul_halaman = 'Edit Data Admin';
+    $label_status  = 'Status Admin';
+} elseif (!empty($data['id_mentor'])) {
+    $role_target   = 'mentor';
+    $judul_halaman = 'Edit Data Mentor';
+    $label_status  = 'Status Mentor';
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $nama   = trim($_POST['nama']);
+    $kontak = trim($_POST['kontak']);
+    $status = $_POST['status'];
+
+    pg_query($conn, "BEGIN");
+
+    $query_mhs  = "UPDATE MAHASISWA SET Nama=$1, Kontak=$2, Status_Mhs=$3 WHERE NIM=$4";
+    $update_mhs = pg_query_params($conn, $query_mhs, array($nama, $kontak, $status, $nim));
+
+    $update_role = true;
+    if ($role_target === 'admin') {
+        $jabatan     = trim($_POST['jabatan']) ?: 'Admin Klinik Prestasi';
+        $update_role = pg_query_params($conn, "UPDATE ADMIN SET Jabatan=$1 WHERE ID_User=$2", array($jabatan, trim($data['id_user'])));
+    } elseif ($role_target === 'mentor') {
+        $bidang      = $_POST['bidang_keahlian'] ?: 'Esai';
+        $update_role = pg_query_params($conn, "UPDATE MENTOR SET Bidang_Keahlian=$1, Status_Mentor=$2 WHERE ID_User=$3", array($bidang, $status, trim($data['id_user'])));
+    }
+
+    if ($update_mhs && $update_role) {
+        pg_query($conn, "COMMIT");
+        echo "<script>alert('$judul_halaman berhasil diperbarui!'); window.location='index.php';</script>";
+    } else {
+        pg_query($conn, "ROLLBACK");
+        echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px; margin-bottom:16px;'>Error: " . htmlspecialchars(pg_last_error($conn)) . "</div>";
+    }
+}
 ?>
 
-<h2>Edit Mahasiswa</h2>
+<h2><?= $judul_halaman ?></h2>
 <div class="form-box">
     <form action="" method="POST">
-        <input type="hidden" name="nim_old" value="<?= $data['NIM'] ?>">
-        
-        <label>NIM</label>
-        <input type="text" value="<?= $data['NIM'] ?>" disabled style="background:#ddd;">
+        <label>ID User (Tidak dapat diubah)</label>
+        <input type="text" value="<?= htmlspecialchars(trim($data['id_user'] ?? '-')) ?>" disabled>
+
+        <?php if ($role_target === 'admin'): ?>
+            <label>Jabatan Admin</label>
+            <input type="text" name="jabatan" value="<?= htmlspecialchars($data['jabatan'] ?? '') ?>" required placeholder="Contoh: Koordinator Klinik Prestasi">
+        <?php elseif ($role_target === 'mentor'): ?>
+            <label>Bidang Keahlian Mentor</label>
+            <select name="bidang_keahlian" required>
+                <option value="Esai" <?= ($data['bidang_keahlian'] ?? '') == 'Esai' ? 'selected' : '' ?>>Esai</option>
+                <option value="KTI" <?= ($data['bidang_keahlian'] ?? '') == 'KTI' ? 'selected' : '' ?>>KTI</option>
+                <option value="Bisnis" <?= ($data['bidang_keahlian'] ?? '') == 'Bisnis' ? 'selected' : '' ?>>Bisnis</option>
+                <option value="Design" <?= ($data['bidang_keahlian'] ?? '') == 'Design' ? 'selected' : '' ?>>Design</option>
+            </select>
+        <?php endif; ?>
 
         <label>Nama Lengkap</label>
-        <input type="text" name="nama" value="<?= $data['NAMA'] ?>" required>
+        <input type="text" name="nama" value="<?= htmlspecialchars($data['nama']) ?>" required>
 
-        <label>Angkatan</label>
-        <select name="angkatan" required>
-            <option value="F19" <?= ($data['ANGKATAN'] == 'F19') ? 'selected' : '' ?>>F19</option>
-            <option value="F20" <?= ($data['ANGKATAN'] == 'F20') ? 'selected' : '' ?>>F20</option>
-            <option value="F21" <?= ($data['ANGKATAN'] == 'F21') ? 'selected' : '' ?>>F21</option>
-            <option value="F22" <?= ($data['ANGKATAN'] == 'F22') ? 'selected' : '' ?>>F22</option>
-            <option value="F23" <?= ($data['ANGKATAN'] == 'F23') ? 'selected' : '' ?>>F23</option>
-        </select>
+        <label>NIM (Tidak dapat diubah)</label>
+        <input type="text" value="<?= htmlspecialchars($data['nim']) ?>" disabled>
 
         <label>Kontak</label>
-        <input type="text" name="kontak" value="<?= $data['KONTAK'] ?>" required>
+        <input type="text" name="kontak" value="<?= htmlspecialchars($data['kontak']) ?>" required>
 
-        <label>Status Keanggotaan</label>
-        <select name="status" required style="border: 2px solid #007bff;">
-            <option value="Aktif" <?= ($data['STATUS_MHS'] == 'Aktif') ? 'selected' : '' ?>>Aktif</option>
-            <option value="Nonaktif" <?= ($data['STATUS_MHS'] == 'Nonaktif') ? 'selected' : '' ?>>Nonaktif (Keluar/Lulus)</option>
+        <label><?= $label_status ?></label>
+        <select name="status">
+            <option value="Aktif" <?= $data['status_mhs'] == 'Aktif' ? 'selected' : '' ?>>Aktif</option>
+            <option value="Nonaktif" <?= $data['status_mhs'] == 'Nonaktif' ? 'selected' : '' ?>>Nonaktif</option>
         </select>
 
-        <br><br>
-        <button type="submit" class="btn btn-blue">Update</button>
-        <a href="index.php" class="btn btn-gray">Batal</a>
+        <div style="margin-top: 20px; display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-blue">Update</button>
+            <a href="index.php" class="btn btn-gray">Batal</a>
+        </div>
     </form>
 </div>
+
 <?php include '../layout/footer.php'; ?>

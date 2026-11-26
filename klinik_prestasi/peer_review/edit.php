@@ -1,72 +1,96 @@
 <?php
 include '../config/db.php';
+include '../layout/header.php';
+wajibRole(['admin', 'mentor']);
 
-$id_url = isset($_GET['id']) ? $_GET['id'] : '';
-if (empty($id_url)) { header("Location: index.php"); exit; }
+$id = $_GET['id'] ?? '';
+$query = "
+    SELECT PR.*, K.Judul_Karya, K.Bidang_Karya 
+    FROM PEER_REVIEW PR 
+    JOIN KARYA K ON PR.ID_Karya = K.ID_Karya 
+    WHERE PR.ID_Review = $1
+";
+$res  = pg_query_params($conn, $query, array($id));
+$data = pg_fetch_assoc($res);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $id_old = $_POST['id_old'];
-    $id_mentor = $_POST['id_mentor'];
-    $status = $_POST['status'];
-    
-    $hasil = $_POST['hasil'];
-    $tanggal = $_POST['tanggal'];
-
-    if ($status == 'Selesai' && empty($tanggal)) {
-        $tanggal = date('Y-m-d');
-    }
-
-    $query = "UPDATE PEER_REVIEW SET ID_Mentor=$1, Status_Review=$2, Hasil_Review=$3, Tanggal_Review=$4 WHERE ID_Review=$5";
-    $params = array($id_mentor, $status, $hasil, $tanggal, $id_old);
-    
-    $result = pg_query_params($conn, $query, $params);
-
-    if ($result) {
-        echo "<script>alert('Data review berhasil disimpan!'); window.location='index.php';</script>";
-    } else {
-        echo "<script>alert('Gagal update.');</script>";
-    }
+if (!$data) {
+    echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px;'>Data review tidak ditemukan.</div>";
+    include '../layout/footer.php';
+    exit;
 }
 
-$query_get = "SELECT * FROM PEER_REVIEW WHERE ID_Review = $1";
-$data = pg_fetch_assoc(pg_query_params($conn, $query_get, array($id_url)));
-if (!$data) die("Data tidak ditemukan.");
-$data = array_change_key_case($data, CASE_UPPER);
+if (hasRole('mentor')) {
+    header("Location: detail.php?id=" . urlencode($id));
+    exit;
+}
 
-include '../layout/header.php';
+$bidang_karya = trim($data['bidang_karya']);
+$mentor_list = pg_query_params($conn, "
+    SELECT MT.ID_Mentor, M.Nama, MT.Bidang_Keahlian 
+    FROM MENTOR MT
+    JOIN USER_MEMBER U ON MT.ID_User = U.ID_User
+    JOIN MAHASISWA M ON U.NIM = M.NIM
+    WHERE M.Status_Mhs = 'Aktif' AND LOWER(MT.Bidang_Keahlian) = LOWER($1)
+    ORDER BY MT.ID_Mentor ASC
+", [$bidang_karya]);
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $status       = $_POST['status'];
+    $hasil        = $_POST['hasil'];
+    $id_mentor    = !empty($_POST['id_mentor']) ? $_POST['id_mentor'] : null;
+    $tanggal_auto = ($status === 'Waiting') ? null : ($data['tanggal_review'] ?: date('Y-m-d'));
+
+    $update = pg_query_params(
+        $conn,
+        "UPDATE PEER_REVIEW SET ID_Mentor=$1, Status_Review=$2, Hasil_Review=$3, Tanggal_Review=$4 WHERE ID_Review=$5",
+        array($id_mentor, $status, $hasil, $tanggal_auto, $id)
+    );
+
+    if ($update) {
+        echo "<script>alert('Status dan penugasan review berhasil diperbarui!'); window.location='index.php';</script>";
+    } else {
+        echo "<div style='background:#fef2f2; color:#dc2626; padding:12px; border-radius:8px; margin-bottom:16px;'>Error: " . htmlspecialchars(pg_last_error($conn)) . "</div>";
+    }
+}
 ?>
 
-<h2>Proses Review Karya</h2>
+<h2>Kelola Penugasan & Status Review</h2>
 <div class="form-box">
     <form action="" method="POST">
-        <input type="hidden" name="id_old" value="<?= $data['ID_REVIEW'] ?>">
-        
-        <label>ID Review / Karya</label>
-        <div style="background:#ddd; padding:5px; margin-bottom:10px;">
-            <?= $data['ID_REVIEW'] ?> (Karya: <?= $data['ID_KARYA'] ?>)
-        </div>
+        <label>ID Karya</label>
+        <input type="text" value="<?= htmlspecialchars(trim($data['id_karya'])) ?>" disabled>
 
-        <label>Mentor Penilai</label>
-        <input type="text" name="id_mentor" value="<?= $data['ID_MENTOR'] ?>" required>
+        <label>Judul Karya & Bidang</label>
+        <input type="text" value="<?= htmlspecialchars($data['judul_karya']) ?> (<?= htmlspecialchars($bidang_karya) ?>)" disabled>
 
-        <hr style="margin: 20px 0; border-top: 2px dashed #ccc;">
-        <h3>Hasil Penilaian</h3>
+        <label>Mentor Penilai (Sesuai Bidang <?= htmlspecialchars($bidang_karya) ?>)</label>
+        <select name="id_mentor" required>
+            <option value="">-- Pilih Mentor --</option>
+            <?php while ($m = pg_fetch_assoc($mentor_list)): ?>
+                <?php $sel = (trim($data['id_mentor'] ?? '') === trim($m['id_mentor'])) ? 'selected' : ''; ?>
+                <option value="<?= trim($m['id_mentor']) ?>" <?= $sel ?>>
+                    <?= trim($m['id_mentor']) ?> — <?= htmlspecialchars($m['nama']) ?> (Spesialis: <?= htmlspecialchars($m['bidang_keahlian']) ?>)
+                </option>
+            <?php endwhile; ?>
+        </select>
 
         <label>Status Review</label>
         <select name="status" required>
-            <option value="Menunggu" <?= ($data['STATUS_REVIEW']=='Menunggu')?'selected':'' ?>>Menunggu / Proses</option>
-            <option value="Selesai" <?= ($data['STATUS_REVIEW']=='Selesai')?'selected':'' ?>>Selesai</option>
+            <option value="Waiting" <?= $data['status_review'] == 'Waiting' ? 'selected' : '' ?>>Waiting</option>
+            <option value="Revision" <?= $data['status_review'] == 'Revision' ? 'selected' : '' ?>>Revision</option>
+            <option value="Finished" <?= $data['status_review'] == 'Finished' ? 'selected' : '' ?>>Finished</option>
         </select>
 
-        <label>Feedback / Hasil Review</label>
-        <textarea name="hasil" rows="6" placeholder="Tuliskan masukan untuk mahasiswa di sini..." style="width:100%; padding:8px; border:1px solid #ccc;"><?= $data['HASIL_REVIEW'] ?></textarea>
+        <label>Catatan / Hasil Review</label>
+        <textarea name="hasil" rows="5" placeholder="Tuliskan masukan, saran perbaikan, atau hasil review di sini..."><?= htmlspecialchars($data['hasil_review'] ?? '') ?></textarea>
 
-        <label>Tanggal Selesai</label>
-        <input type="date" name="tanggal" value="<?= $data['TANGGAL_REVIEW'] ?>">
+        <label>Tanggal Review (Otomatis)</label>
+        <input type="text" value="<?= htmlspecialchars($data['tanggal_review'] ?: date('Y-m-d')) ?>" disabled>
 
-        <br><br>
-        <button type="submit" class="btn btn-blue">Simpan Hasil Review</button>
-        <a href="index.php" class="btn btn-gray">Batal</a>
+        <div style="margin-top: 20px; display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-blue">Simpan Perubahan</button>
+            <a href="index.php" class="btn btn-gray">Batal</a>
+        </div>
     </form>
 </div>
 

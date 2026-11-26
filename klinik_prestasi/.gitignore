@@ -1,5 +1,5 @@
 # Abaikan koneksi database lokal yang berisi password asli
-klinik_prestasi/config/db.php
+config/db.php
 
 # Abaikan file sampah/pengaturan editor
 .vscode/
