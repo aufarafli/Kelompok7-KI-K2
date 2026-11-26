@@ -85,6 +85,29 @@ File `klinik_prestasi/config/db.php` tidak ikut diunggah ke GitHub (diabaikan me
    - **Mentor (`MENTOR`):** Format awalan **`M`** + 3 digit angka ID (contoh: `M001`), beserta password akunnya.
    - **Mahasiswa (`MAHASISWA`):** Format awalan **`U`** + 3 digit angka ID (contoh: `U001`) atau NIM/ID User mahasiswa yang terdaftar, beserta password akunnya.
 
+### 7. Contoh Alur Penggunaan Aplikasi per Peran
+
+Berikut gambaran alur penggunaan sistem di `localhost` untuk ketiga jenis pengguna (Mahasiswa, Mentor, dan Admin) dari masuk ke sistem hingga keluar:
+
+- **Alur Mahasiswa (`MAHASISWA`, contoh ID User: `U001`):**
+  1. Buka halaman `login.php`, masukkan ID User mahasiswa (misalnya `U001`) beserta *password*, lalu klik **Masuk ke Sistem**.
+  2. Setelah autentikasi berhasil, pengguna diarahkan ke *dashboard* (`index.php`) dengan ringkasan karya serta status *review* miliknya.
+  3. Buka modul **Data Karya** (`karya/`) untuk menambahkan atau mengelola data karya (judul, kategori, serta tautan dokumen) dan mengajukan *peer review* melalui modul **Peer Review** (`peer_review/`).
+  4. Pantau perkembangan status *review* dan catatan masukan dari mentor secara berkala.
+  5. Setelah selesai, klik **Logout** agar sesi berakhir dengan aman dan tercatat pada log aktivitas.
+
+- **Alur Mentor (`MENTOR`, contoh ID User: `M001`):**
+  1. Buka halaman `login.php`, masukkan ID User mentor (misalnya `M001`) beserta *password*, lalu klik **Masuk ke Sistem**.
+  2. Masuk ke *dashboard* (`index.php`) untuk melihat daftar tugas peninjauan/rekapitulasi sesuai cakupan peran mentor.
+  3. Buka modul **Peer Review** (`peer_review/`) untuk memeriksa pengajuan karya yang ditugaskan/dapat diakses, meninjau tautan/detail karya, lalu memperbarui status serta catatan/hasil evaluasi *review*.
+  4. Periksa ringkasan atau laporan terkait sesuai hak akses mentor, lalu klik **Logout** setelah selesai menggunakan aplikasi.
+
+- **Alur Admin (`ADMIN`, contoh ID User: `A001`):**
+  1. Buka halaman `login.php`, masukkan ID User admin (misalnya `A001`) beserta *password*, lalu klik **Masuk ke Sistem**.
+  2. Masuk ke *dashboard* (`index.php`) untuk memantau statistik keseluruhan sistem (data pengguna/mahasiswa, karya terdaftar, dan status *review*).
+  3. Kelola dan pantau data pada modul **Data Mahasiswa** (`mahasiswa/`), **Data Karya** (`karya/`), **Peer Review** (`peer_review/`), maupun **Laporan Review** (`laporan_review/`) sesuai kebutuhan pengelolaan sistem.
+  4. Buka modul **Audit Log** (`audit_log/`) untuk meninjau riwayat aktivitas pengguna (seperti *login*, *logout*, dan aksi penting lainnya) beserta informasi peran, waktu, dan alamat IP, kemudian klik **Logout** saat selesai.
+
 ---
 
 ## Penerapan Modul Keamanan AAA
@@ -131,8 +154,3 @@ Accounting mencatat jejak aktivitas penting pengguna di sistem sebagai bentuk tr
   - `klinik_prestasi/config/audit.php` — menyediakan fungsi pencatatan log (seperti `catatAuditLog()`) yang mengambil informasi sesi pengguna dan alamat IP klien lalu menyimpannya ke tabel `audit_log`.
   - `klinik_prestasi/login.php` dan `klinik_prestasi/logout.php` — memanggil fungsi pencatatan log saat pengguna melakukan *login* maupun *logout*.
   - `klinik_prestasi/audit_log/` — menyediakan halaman/modul untuk menampilkan dan memantau catatan riwayat aktivitas yang tersimpan di `audit_log`.
----
-
-### Catatan Penyesuaian Sebelum Di-commit
-- Jika di repositori kalian nama *helper* atau nama *file* di dalam `audit_log/` / `peer_review/` sedikit berbeda (misalnya `index.php` di dalam `audit_log/`), tinggal sesuaikan nama filenya pada bagian **Rincian penerapan & lokasi file terkait** agar 100% cocok dengan struktur folder aktual.
-- Jika ada bagian tertentu yang ingin ditambahkan—misalnya daftar akun uji coba atau alur *workflow* pengajuan *peer review*—beri tahu saja supaya bisa langsung digabungkan.
